@@ -57,21 +57,35 @@ def softmax(inputs):
     expon = np.exp(inputs - np.max(inputs, axis=1, keepdims=True))
     return expon / np.sum(expon, axis=1, keepdims=True)
 
-# OTHER
+def d_relu(x):
+  return 1. if x > 0 else 0. # todo: remove .
+
 def layer(x, w, b):
   return np.dot(x, w) + b
 
 # categorical cross entropy loss
 def loss(o, l):
   # todo: clip
+  # low confidece -> higher loss
   confidence = np.sum(o * l, axis=1)
   neglog = -np.log(confidence)
-  return np.mean(neglog) 
+  print(confidence, confidence.shape)
+  print(neglog, neglog.shape)
+  print("adammmmmm")
+  print(np.sum(neglog))
+  return np.mean(neglog) # avg loss per batch
 
 def accuracy(o, l):
   prediction = np.argmax(o, axis=1)
   goal = np.argmax(l, axis=1)
+  print(prediction)
+  print(goal)
   return np.mean(prediction == goal)
+
+
+
+# todo: add epoch
+
 
 # init weights & biases
 w1 = 0.1 * np.random.randn(784, 16)
@@ -81,19 +95,24 @@ b2 = np.zeros((1, 10))
 
 # FORWARD PROP
 # input layer -> hidden layer
+# 60k x 16
 l1 = layer(images, w1, b1)
 a1 = relu(l1)
 # hiden layer -> output layer
+# 60k x 10
 l2 = layer(a1, w2, b2)
 a2 = softmax(l2)
+
+print("=============")
 
 print("loss:", loss(a2, labels))
 
 print("accuracy", accuracy(a2, labels))
 
+print("myloss:")
 
+fuck = -np.sum(labels * np.log(a2))
 
+print(fuck)
 
-
-
-
+print(a2)
