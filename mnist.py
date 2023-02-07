@@ -8,111 +8,184 @@ def displayImage(num):
     if (i+1) % 28 == 0:
       print()
 
-def loadData(name):
-  tmp = []
-  with open(f"dataset/{name}-ubyte", "rb") as f:
-    arr = f.read()
-    #2agicNum = int.from_bytes(arr[0:4], "big") # 2049: labels, 2051: images
-    #itemNum = int.from_bytes(arr[4:8], "big")
-    # images
-    if int.from_bytes(arr[0:4], "big") == 2051: # 2051: image, 2049: labels
-      # num of rows * num of columns
-      pixelNum = int.from_bytes(arr[8:12], "big") * int.from_bytes(arr[12:16], "big")
-      for i in range(16, len(arr), pixelNum):
-        # pixel value as pct of 255
-        tmp.append([arr[j]/255 for j in range(i, i + pixelNum)])
-    # labels
-    else: 
-      # one hot encoding
-      for x in arr[8:]:
-        onehot = [0] * 10
-        onehot[x] = 1
-        tmp.append(onehot)
-        #tmp.append(x)
-    return np.array(tmp)
+with open('train.npy', 'rb') as f:
+  images = np.load(f)
+  labels = np.load(f)
 
-images = loadData("train-images-idx3")
-labels = loadData("train-labels-idx1")
-
-pxlNum, imgNum = images.shape # todo: rename to batch size or X (Xtrain, Xtest)
-print(pxlNum, imgNum) 
-print()
+imgnum, pxlnum = images.shape # todo: rename to batch size or X (Xtrain, Xtest)
+#print(imgnum, pxlnum) 
+#print()
 #displayImage(0)
 
-print(images.shape)
-print(labels.shape)
 
 # 10 classes, 60 000 samples
 
-print("-------------------------------")
+#print("-------------------------------")
 # softmax: exp -> noramlize
 # categorical croos entropy
 
 
 # ACTIVATION FUNCTIONS
-def relu(inputs):
-  return np.maximum(0, inputs)
+def randmatrix(r, c=0):
+  # random values [-0.5, 0.5)
+  return np.random.rand(r, c) - 0.5
 
-def softmax(inputs):
-    expon = np.exp(inputs - np.max(inputs, axis=1, keepdims=True))
-    return expon / np.sum(expon, axis=1, keepdims=True)
-
-def d_relu(x):
-  return 1. if x > 0 else 0. # todo: remove .
-
-def layer(x, w, b):
-  return np.dot(x, w) + b
-
-# categorical cross entropy loss
-def loss(o, l):
-  # todo: clip
-  # low confidece -> higher loss
-  confidence = np.sum(o * l, axis=1)
-  neglog = -np.log(confidence)
-  print(confidence, confidence.shape)
-  print(neglog, neglog.shape)
-  print("adammmmmm")
-  print(np.sum(neglog))
-  return np.mean(neglog) # avg loss per batch
-
-def accuracy(o, l):
-  prediction = np.argmax(o, axis=1)
-  goal = np.argmax(l, axis=1)
-  print(prediction)
-  print(goal)
-  return np.mean(prediction == goal)
+def layer(w, a, b):
+  print(w.shape, a.shape, b.shape)
+  return w @ a - b
 
 
+# todo: undefinded in x = 0
+def relu(a):
+  # element wise maximum
+  #return np.maximum(0, a)
+  return np.array([0 if x < 0 else x for x in a])
 
-# todo: add epoch
+def der_relu(a):
+  return np.array([0 if x < 0 else 1 for x in a])
+
+#def softmax(a):
+    ## add numerical stability?
+    #x = a - np.max(a, axis=1, keepdims=True) # numerical stability (just to be sure)
+    #exp = np.exp(x)
+    #print(np.sum(exp, axis=1).shape)
+    #return exp / np.sum(exp, axis=0, keepdims=True)
+
+# logits -> prob
+def softmax(a):
+  x = a - np.max(a) # numerical stability (just to be sure)
+  exp = np.exp(x)
+  return exp / np.sum(exp)
+
+# partial derivative of pi wrt xj
+# &pi / &xj (& = partial)
+# pi * (1 - pj) : if i=j
+# -pj * pi      : if i!=j
+def der_softmax(a):
+  ones = np.ones(a.shape[0])
+  return a @ (ones - a)
+
+def cost(x, l):
+  # small if correct (confident)
+  return ((x - l) ** 2).sum(axis=1)
+
+
+# todo: rename image, labels -> x, y
+EPOCHS = 1
+BATCHSIZE = 25
+LR = 1e-3
 
 
 # init weights & biases
-w1 = 0.1 * np.random.randn(784, 16)
-b1 = np.zeros((1, 16))
-w2 = 0.1 * np.random.randn(16, 10)
-b2 = np.zeros((1, 10))
+# num of weights: 784 * 64 + 64 * 10 = 50 816
+# num of biases:        64 +      10  = 858
+w1 = randmatrix(64, 784)
+b1 = randmatrix(64, 1)
+w2 = randmatrix(10, 64)
+b2 = randmatrix(10, 1)
 
-# FORWARD PROP
-# input layer -> hidden layer
-# 60k x 16
-l1 = layer(images, w1, b1)
-a1 = relu(l1)
-# hiden layer -> output layer
-# 60k x 10
-l2 = layer(a1, w2, b2)
-a2 = softmax(l2)
 
-print("=============")
+#print(a2)
+#print("cost", cost(a2, labels))
+#print("avg cost", cost(a2, labels).sum() / imgnum)
 
-print("loss:", loss(a2, labels))
 
-print("accuracy", accuracy(a2, labels))
+#print()
+#print(a2[0] , labels[0])
+#print("changes we want in output", - (a2[0] - labels[0]))
 
-print("myloss:")
+# gradient perpendicular to contour lines
 
-fuck = -np.sum(labels * np.log(a2))
+# negative gradient of cost function = avg changes we want to make (to weights & biases) over all images
 
-print(fuck)
 
-print(a2)
+for epoch in range(EPOCHS):
+  # batch
+  for i in range(0, imgnum, BATCHSIZE):
+    bx, by = images[i:i+BATCHSIZE], labels[i:i+BATCHSIZE]
+    bx, by = bx.T, by.T
+    for j in range(BATCHSIZE):
+      sample = i+j
+      print("sample:", sample)
+      tx, ty = images[sample:sample + 1], labels[sample:sample + 1]
+      print(tx.shape, ty.shape)
+      tx, ty = tx.T, ty.T
+      # FORWARD PROP
+      # layer one
+      l1 = layer(w1, tx, b1)
+      print("l1", l1, l1.shape)
+      a1 = relu(l1)
+      print("a1", a1, a1.shape)
+      exit()
+      # layer two
+      l2 = layer(w2, a1, b2)
+      a2 = softmax(l2)
+      print("a2", a2, a2.shape)
+      print("check", np.sum(a2))
+      print("by", by, by.shape)
+      exit()
+
+
+
+
+
+
+
+
+
+
+
+    exit()
+
+
+
+
+
+
+
+#def relu(inputs):
+#  return np.maximum(0, inputs)
+#
+#def softmax(inputs):
+#    expon = np.exp(inputs - np.max(inputs, axis=1, keepdims=True))
+#    return expon / np.sum(expon, axis=1, keepdims=True)
+#
+#def d_relu(x):
+#  return 1. if x > 0 else 0. # todo: remove .
+#
+#def layer(x, w, b):
+#  print(x.shape, w.shape, b.shape)
+#  return x @ w + b
+
+
+## categorical cross entropy loss
+#def loss(o, l):
+  ## todo: clip
+  ## low confidece -> higher loss
+  #confidence = np.sum(o * l, axis=1)
+  #neglog = -np.log(confidence)
+  #print(confidence, confidence.shape)
+  #print(neglog, neglog.shape)
+  #print("adammmmmm")
+  #print(np.sum(neglog))
+  #return np.mean(neglog) # avg loss per batch
+
+#def accuracy(o, l):
+  #prediction = np.argmax(o, axis=1)
+  #goal = np.argmax(l, axis=1)
+  #print(prediction)
+  #print(goal)
+  #return np.mean(prediction == goal)
+#print("=============")
+
+#print("loss:", loss(a2, labels))
+
+#print("accuracy", accuracy(a2, labels))
+
+#print("myloss:")
+
+#fuck = -np.sum(labels * np.log(a2))
+
+#print(fuck)
+
+#print(a2)
