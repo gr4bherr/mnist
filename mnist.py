@@ -115,8 +115,8 @@ class layer:
   def __init__(self, f, t):
     self.weights = np.random.rand(t, f) - 0.5
     self.biases = np.random.rand(t, 1) - 0.5
-    self.f = f # dim from
-    self.t = t # dim to
+    self.dfrom = f # dim from
+    self.dto = t # dim to
   
   def z(self, x): # todo: better name
     return self.weights @ x - self.biases
@@ -134,6 +134,7 @@ class model:
     self.l2 = layer(64, 16)
     self.l3 = layer(16, 10)
     self.l = [self.l0, self.l1, self.l2, self.l3]
+    self.dimnum = len(self.l)
     #print(self.l0, self.l1, self.l2)
   
   def forward(self, x, y):
@@ -153,35 +154,59 @@ class model:
   
   # *** BACK ***
 
-  def _endgrad(self, L):
-    lnum = len(self.l) - 1
-    print(L, lnum)
+  def _endgrad(self, L, prevnodecnt):
+    # number of layers
 
-    if L > lnum:
-      return 2 * (self.a[L] - self.y[L])
-    else:
-      s = []
-      for tt in range(self.l[L].t):
-        s += self.l[L].weights[tt] * sigmoid_der(self.z[L][tt, self.n]) * self._endgrad(L-1)
+    s = 0
+    # go through all nodes in next layer
+    for nodecnt in range(self.l[L].dto):
+      if L == self.dimnum - 1: # last layer
+        #print(self.a[L][nodecnt, self.n], self.y[nodecnt, self.n])
+        print("x", end=" ")
+        s += 2 * (self.a[L][nodecnt, self.n] - self.y[nodecnt, self.n]) # todo: always the same
+      else:
+        print(L, "nodecnt:", nodecnt, "/", self.l[L].dto, end=" ")
 
-    exit()
-    return l
+        #print(self.l[L].weights[nodecnt, prevnodecnt])
+        #print(sigmoid_der(self.z[L][nodecnt, self.n]))
+        #print(self._endgrad(L+1))
+        s += self.l[L].weights[nodecnt, prevnodecnt] * sigmoid_der(self.z[L][nodecnt, self.n]) * self._endgrad(L+1, nodecnt)
+
+    # if L == 1:
+    #   print(f"s: {s} ({L, self.n, prevnodecnt}")
+    # elif L == 2:
+    #   print(f"\ts: {s} ({L, self.n, prevnodecnt}")
+    # elif L == 3:
+    #   print(f"\t\ts: {s} ({L, self.n, prevnodecnt}")
+    # else: 
+    #   print(f"\t\ts: {s} ({L, self.n, prevnodecnt}")
+    #   exit()
+    print(s)
+    return s
 
   # gradient of w_ft
-  def _basegrad(self):
-    L = 1 # L
-    #print(self.a[L-1][self.ff, self.n])
-    #print(sigmoid_der(self.z[L][self.tt, self.n].shape))
-    print(self._endgrad(L))
-    return 50
+  def _basegrad(self, doweight):
+    L = self.ll
+    #if doweight:
+      #print(self.a[self.ll-1][self.ff, self.n])
+    #else:
+      #print(1)
+    #print(self.z[L][self.tt, self.n]) # self.z[L][self.tt][self.n]
+    #print(sigmoid_der(self.z[self.ll][self.tt, self.n]))
+    #print(self._endgrad(self.ll))
+    return self.a[L-1][self.ff, self.n] * sigmoid_der(self.z[L][self.tt, self.n]) * self._endgrad(L, self.tt)
 
   # avg gradients of all columns fw
-  def _avggrad(self):
-    cn = []
+  def _avggrad(self, doweight=True):
+    cn = 0
+    # go through every batch sample
     for self.n in range(BS):
       #cn.append(self._basegrad(self.fw[:, n]))
-      cn.append(self._basegrad())
-    return sum(cn) / BS
+      print("n:", self.n)
+      cn += self._basegrad(doweight)
+      print(cn)
+      exit()
+    return cn / BS
     #return np.sum(grad(), axis=0) 
 
 
@@ -189,9 +214,18 @@ class model:
     self.fw = fw
     print("**** BACK ****")
     cgrad = [] # row: 784 * 64 + 64; col: BS
-    for self.ff in range(self.l[1].f): # weights
-      cgrad.append(self._avggrad())
-    # for self.tt in range(self.l[1].t):  # biases
+    # go through all biases and weights from input layer
+    for self.ll in range(1, self.dimnum):
+      print("ll", self.ll) # 1 - 3
+      for self.tt in range(self.l[self.ll].dto):  # biases
+        print(self.l[self.ll].dto)
+        print("tt", self.tt) # 0 - 63
+        for self.ff in range(self.l[self.ll].dfrom): # weights
+          print(self.l[self.ll].dfrom)
+          print("ff", self.ff) # 0 - 784
+          cgrad.append(self._avggrad())
+          exit()
+        #cgrad.append(self._avggrad(False)) # todo: add biases
     return np.array(cgrad)
 
 
@@ -233,49 +267,6 @@ for epoch in range(EPOCHS):
 
 
 
-    # todo: this is just for one image at a time
-    #for j in range(BATCHSIZE):
-    #sample = i+j
-    #tx, ty = images[sample:sample + 1], labels[sample:sample + 1]
-    #tx, ty = tx.T, ty.T
-
-    ## FORWARD PROP
-    ## layer one
-    #z1 = layer(w1, bx, b1)
-    #print("z1", z1, z1.shape)
-    #a1 = relu(z1)
-    #print("a1", a1, a1.shape)
-    ## layer two
-    #z2 = layer(w2, a1, b2)
-    #print("l2", z2, z2.shape)
-    #a2 = softmax(z2)
-    #print("a2", a2, a2.shape)
-    #print("check", np.sum(a2, axis=0)) # sum of col
-    #print("by", by, by.shape)
-    #c = cost(a2, by) # c0, c1, ..., c24 (one for each image)
-    #print("c", c, c.shape)
-    #print("avg c", c.shape[1] / np.sum(c))
-    ## BACK PROP
-
-    #z1 = layer(w1, bx, b1)
-    #a1 = sigmoid(z1)
-    #z2 = layer(w2, a1, b2)
-    #a2 = sigmoid(z2)
-    #z3 = layer(w3, a2, b3)
-    #a3 = sigmoid(z3)
-    #print(a3, a3.shape)
-    #print("by", by, by.shape)
-    #c = cost(a3, by) # c0, c1, ..., c24 (one for each image)
-    #print("c", c, c.shape)
-    #print(np.sum(c))
-    #print("avg c", np.sum(c) / c.shape[1])
-    
-
-
-
-
-
-
 
 
 
@@ -284,54 +275,3 @@ for epoch in range(EPOCHS):
     exit()
 
 
-
-
-
-
-
-#def relu(inputs):
-#  return np.maximum(0, inputs)
-#
-#def softmax(inputs):
-#    expon = np.exp(inputs - np.max(inputs, axis=1, keepdims=True))
-#    return expon / np.sum(expon, axis=1, keepdims=True)
-#
-#def d_relu(x):
-#  return 1. if x > 0 else 0. # todo: remove .
-#
-#def layer(x, w, b):
-#  print(x.shape, w.shape, b.shape)
-#  return x @ w + b
-
-
-## categorical cross entropy loss
-#def loss(o, l):
-  ## todo: clip
-  ## low confidece -> higher loss
-  #confidence = np.sum(o * l, axis=1)
-  #neglog = -np.log(confidence)
-  #print(confidence, confidence.shape)
-  #print(neglog, neglog.shape)
-  #print("adammmmmm")
-  #print(np.sum(neglog))
-  #return np.mean(neglog) # avg loss per batch
-
-#def accuracy(o, l):
-  #prediction = np.argmax(o, axis=1)
-  #goal = np.argmax(l, axis=1)
-  #print(prediction)
-  #print(goal)
-  #return np.mean(prediction == goal)
-#print("=============")
-
-#print("loss:", loss(a2, labels))
-
-#print("accuracy", accuracy(a2, labels))
-
-#print("myloss:")
-
-#haha = -np.sum(labels * np.log(a2))
-
-#print(haha)
-
-#print(a2)
