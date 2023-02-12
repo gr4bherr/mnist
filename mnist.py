@@ -154,35 +154,28 @@ class model:
   
   # *** BACK ***
 
-  def _endgrad(self, L, prevnodecnt):
+  def _endgrad(self, L):
     # number of layers
 
-    s = 0
     # go through all nodes in next layer
-    for nodecnt in range(self.l[L].dto):
-      if L == self.dimnum - 1: # last layer
-        #print(self.a[L][nodecnt, self.n], self.y[nodecnt, self.n])
-        print("x", end=" ")
-        s += 2 * (self.a[L][nodecnt, self.n] - self.y[nodecnt, self.n]) # todo: always the same
-      else:
-        print(L, "nodecnt:", nodecnt, "/", self.l[L].dto, end=" ")
+    #for nodecnt in range(self.l[L].dto):
+    if L == self.dimnum - 1: # last layer
 
-        #print(self.l[L].weights[nodecnt, prevnodecnt])
-        #print(sigmoid_der(self.z[L][nodecnt, self.n]))
-        #print(self._endgrad(L+1))
-        s += self.l[L].weights[nodecnt, prevnodecnt] * sigmoid_der(self.z[L][nodecnt, self.n]) * self._endgrad(L+1, nodecnt)
+      # loss function derivative
+      return 2 * (self.a[L][:, self.n] - self.y[:, self.n]) # todo: always the same
+    else:
+      #print(L, "/", self.l[L].dto, end=" ")
 
-    # if L == 1:
-    #   print(f"s: {s} ({L, self.n, prevnodecnt}")
-    # elif L == 2:
-    #   print(f"\ts: {s} ({L, self.n, prevnodecnt}")
-    # elif L == 3:
-    #   print(f"\t\ts: {s} ({L, self.n, prevnodecnt}")
-    # else: 
-    #   print(f"\t\ts: {s} ({L, self.n, prevnodecnt}")
-    #   exit()
-    print(s)
-    return s
+
+      af = self.l[L+1].weights.T
+      bf = sigmoid_der(self.z[L+1][:, self.n]) 
+      cf = self._endgrad(L+1)
+      #print(af.shape, bf.shape, cf.shape)
+      #tmp.append(self.l[L+1].weights.T * sigmoid_der(self.z[L+1][:, self.n]) * self._endgrad(L+1))
+      #print(af @ (bf * cf))
+      #print((af@(bf*cf)).shape)
+      return af @ (bf * cf)
+
 
   # gradient of w_ft
   def _basegrad(self, doweight):
@@ -191,40 +184,51 @@ class model:
       #print(self.a[self.ll-1][self.ff, self.n])
     #else:
       #print(1)
-    #print(self.z[L][self.tt, self.n]) # self.z[L][self.tt][self.n]
-    #print(sigmoid_der(self.z[self.ll][self.tt, self.n]))
-    #print(self._endgrad(self.ll))
-    return self.a[L-1][self.ff, self.n] * sigmoid_der(self.z[L][self.tt, self.n]) * self._endgrad(L, self.tt)
+
+    sa = self.a[L-1][self.ff, self.n] 
+    sb = sigmoid_der(self.z[L][:, self.n]) 
+    sc = self._endgrad(L)
+    #print(sa.shape, sb.shape, sc.shape)
+    #print(sa)
+    #return self.a[L-1][self.ff, self.n] * sigmoid_der(self.z[L][self.tt, self.n]) * self._endgrad(L)
+    #print(sa * sb * sc)
+    #print((sa * sb * sc).shape)
+    sfuck = sa * sb * sc
+    return [sa * sb * sc]
 
   # avg gradients of all columns fw
   def _avggrad(self, doweight=True):
-    cn = 0
+    #cn = np.array([])
+    cn = np.empty((0, self.l[self.ll].dto), float)
+    #cn = []
     # go through every batch sample
     for self.n in range(BS):
       #cn.append(self._basegrad(self.fw[:, n]))
-      print("n:", self.n)
-      cn += self._basegrad(doweight)
-      print(cn)
-      exit()
-    return cn / BS
+      cn = np.append(cn, self._basegrad(doweight), axis=0)
+    #print("***DONE***")
+    fuckme = np.sum(cn, axis=0) / BS
+    #print(sum(fuckme))
+    print(fuckme.shape)
+    return fuckme
     #return np.sum(grad(), axis=0) 
 
 
   def backward(self, fw):
     self.fw = fw
     print("**** BACK ****")
-    cgrad = [] # row: 784 * 64 + 64; col: BS
+    cgrad = np.array([]) # row: 784 * 64 + 64; col: BS
     # go through all biases and weights from input layer
     for self.ll in range(1, self.dimnum):
       print("ll", self.ll) # 1 - 3
-      for self.tt in range(self.l[self.ll].dto):  # biases
-        print(self.l[self.ll].dto)
-        print("tt", self.tt) # 0 - 63
-        for self.ff in range(self.l[self.ll].dfrom): # weights
-          print(self.l[self.ll].dfrom)
-          print("ff", self.ff) # 0 - 784
-          cgrad.append(self._avggrad())
-          exit()
+      #for self.tt in range(self.l[self.ll].dto):  # biases
+        #print(self.l[self.ll].dto)
+        #print("tt", self.tt) # 0 - 63
+      for self.ff in range(self.l[self.ll].dfrom): # weights
+        #print(self.l[self.ll].dfrom)
+        print("ff", self.ff, end=" ") # 0 - 784
+        cgrad = np.append(cgrad, self._avggrad())
+    print(cgrad.shape)
+    exit()
         #cgrad.append(self._avggrad(False)) # todo: add biases
     return np.array(cgrad)
 
