@@ -74,7 +74,7 @@ class model:
       # loss function derivative
       return squarederror_der(self.activations[L][:, self.currentbatch], self.y[:, self.currentbatch])
     else:
-      if self.doweight:
+      if self.weightorbias:
         a = self.layers[L+1].weights.T # matrix 
       else: 
         a = self.layers[L+1].biases.T # vektor (matrix in np)
@@ -85,7 +85,7 @@ class model:
   # gradient of w_ft
   def _basegrad(self):
     L = self.currentlayer
-    if self.doweight:
+    if self.weightorbias:
       a = self.activations[L-1][self.currentrow, self.currentbatch] # scalar
       b = sigmoid_der(self.lincomb[L][:, self.currentbatch]) # vektor
     else:
@@ -96,7 +96,7 @@ class model:
 
   # avg gradients of all columns fw
   def _avggrad(self):
-    if self.doweight:
+    if self.weightorbias:
       cn = np.empty((0, self.layers[self.currentlayer].dto), float)
       appendaxis = 0
     else:
@@ -110,17 +110,19 @@ class model:
     return np.sum(cn, axis=0) / BS # vektor
 
   def backward(self):
-    print("**** BACK ****")
+    #print("**** BACK ****")
     cgradweights = np.empty((0, ), float)
     #cgradbias = np.array([])
     cgradbiases = np.empty((0, ), float)
     # go through all biases and weights from input layer
     for self.currentlayer in range(1, self.dimnum):
-      for self.currentrow in range(self.layers[self.currentlayer].dfrom): # weights
-        self.doweight = True
+      # weights
+      for self.currentrow in range(self.layers[self.currentlayer].dfrom):
+        self.weightorbias = True
         cgradweights = np.append(cgradweights, self._avggrad())
+      # biases
       for self.currentrow in range(self.layers[self.currentlayer].dto):
-        self.doweight = False
+        self.weightorbias = False
         cgradbiases = np.append(cgradbiases, self._avggrad())
     return cgradweights, cgradbiases
 
@@ -146,7 +148,34 @@ for epoch in range(EPOCHS):
     print("mean squared error", m.cost(m.activations[-1], by, 1))
 
     namblaw, namblab = m.backward()
-    print("cn gradient w", namblaw, namblaw.shape)
-    print("cn gradient b", namblab, namblab.shape)
+    #print("cn gradient w", namblaw, namblaw.shape)
+    #print("cn gradient b", namblab, namblab.shape)
 
-    exit()
+
+
+
+    # print("this")
+    # fuck = np.concatenate((m.layers[1].biases.flatten(), m.layers[2].biases.flatten(), m.layers[3].biases.flatten()))
+    # for i in range(90):
+    #   print(f"b{i}: {fuck[i]} -> {namblab[i]:.04f}", end="\t\t")
+    #   if i % 4 == 0:
+    #     print()
+
+
+    cunt = 0
+    funt = 0
+    for i in range(1, m.dimnum):
+      for r in range(m.layers[i].dto): # for bias  (r, 0)
+        # biases
+        #print(c,r,"\t\t", funt,"\t", m.layers[i].biases[r][0],"\t", namblab[funt])
+        m.layers[i].biases[r][0] += namblab[funt]
+        funt += 1
+        for c in range(m.layers[i].dfrom):
+          # weights
+          #print(c,r,"\t\t", cunt,"\t", m.layers[i].weights[r][c],"\t", namblaw[cunt])
+          m.layers[i].weights[r][c] += namblaw[cunt]
+          cunt += 1
+
+
+
+
