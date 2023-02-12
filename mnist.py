@@ -155,81 +155,77 @@ class model:
   # *** BACK ***
 
   def _endgrad(self, L):
-    # number of layers
-
     # go through all nodes in next layer
-    #for nodecnt in range(self.l[L].dto):
     if L == self.dimnum - 1: # last layer
-
       # loss function derivative
       return 2 * (self.a[L][:, self.n] - self.y[:, self.n]) # todo: always the same
     else:
-      #print(L, "/", self.l[L].dto, end=" ")
-
-
-      af = self.l[L+1].weights.T
-      bf = sigmoid_der(self.z[L+1][:, self.n]) 
-      cf = self._endgrad(L+1)
-      #print(af.shape, bf.shape, cf.shape)
-      #tmp.append(self.l[L+1].weights.T * sigmoid_der(self.z[L+1][:, self.n]) * self._endgrad(L+1))
-      #print(af @ (bf * cf))
-      #print((af@(bf*cf)).shape)
-      return af @ (bf * cf)
+      if self.doweight:
+        af = self.l[L+1].weights.T # matrix 
+      else: 
+        af = self.l[L+1].biases.T # vektor (matrix in np)
+      bf = sigmoid_der(self.z[L+1][:, self.n]) # vektor
+      cf = self._endgrad(L+1) # vektor
+      return af @ (bf * cf) # vektor (scalar if bias)
 
 
   # gradient of w_ft
-  def _basegrad(self, doweight):
+  def _basegrad(self):
     L = self.ll
-    #if doweight:
-      #print(self.a[self.ll-1][self.ff, self.n])
-    #else:
-      #print(1)
-
-    sa = self.a[L-1][self.ff, self.n] 
-    sb = sigmoid_der(self.z[L][:, self.n]) 
-    sc = self._endgrad(L)
-    #print(sa.shape, sb.shape, sc.shape)
-    #print(sa)
-    #return self.a[L-1][self.ff, self.n] * sigmoid_der(self.z[L][self.tt, self.n]) * self._endgrad(L)
-    #print(sa * sb * sc)
-    #print((sa * sb * sc).shape)
+    if self.doweight:
+      sa = self.a[L-1][self.ff, self.n] # scalar
+      sb = sigmoid_der(self.z[L][:, self.n]) # vektor
+    else:
+      sa = 1
+      sb = sigmoid_der(self.z[L][self.ff, self.n]) # vektor
+    sc = self._endgrad(L) # vektor (scalar if bias)
     sfuck = sa * sb * sc
-    return [sa * sb * sc]
+    return [sa * sb * sc] # vektor
 
   # avg gradients of all columns fw
-  def _avggrad(self, doweight=True):
-    #cn = np.array([])
-    cn = np.empty((0, self.l[self.ll].dto), float)
-    #cn = []
+  def _avggrad(self):
+    if self.doweight:
+      cn = np.empty((0, self.l[self.ll].dto), float)
+      for self.n in range(BS):
+        cn = np.append(cn, self._basegrad(), axis=0)
+      fuckme = np.sum(cn, axis=0) / BS
+    else:
+      cn = np.array([])
+      for self.n in range(BS):
+        cn = np.append(cn, self._basegrad())
+      fuckme = np.sum(cn, axis=0) / BS
     # go through every batch sample
-    for self.n in range(BS):
-      #cn.append(self._basegrad(self.fw[:, n]))
-      cn = np.append(cn, self._basegrad(doweight), axis=0)
-    #print("***DONE***")
-    fuckme = np.sum(cn, axis=0) / BS
-    #print(sum(fuckme))
     print(fuckme.shape)
-    return fuckme
-    #return np.sum(grad(), axis=0) 
+    return fuckme # vektor
 
 
   def backward(self, fw):
     self.fw = fw
     print("**** BACK ****")
-    cgrad = np.array([]) # row: 784 * 64 + 64; col: BS
+    #cgrad = np.array([]) # row: 784 * 64 + 64; col: BS
+    cgrad = np.empty((0, ), float)
+    cgradbias = np.array([])
     # go through all biases and weights from input layer
     for self.ll in range(1, self.dimnum):
       print("ll", self.ll) # 1 - 3
-      #for self.tt in range(self.l[self.ll].dto):  # biases
-        #print(self.l[self.ll].dto)
-        #print("tt", self.tt) # 0 - 63
       for self.ff in range(self.l[self.ll].dfrom): # weights
-        #print(self.l[self.ll].dfrom)
+        self.doweight = True
         print("ff", self.ff, end=" ") # 0 - 784
         cgrad = np.append(cgrad, self._avggrad())
+      # todo: biases
+      for self.ff in range(self.l[self.ll].dto):
+        print("ffb", self.ff, end=" ") # 0 - 784
+        self.doweight = False
+        cgradbias = np.append(cgradbias, self._avggrad())
+
     print(cgrad.shape)
+    print(cgradbias.shape)
+    for x in cgrad:
+      print(x, end=", ")
+    print("\n\n\n")
+    for x in cgradbias:
+      print(x, end=", ")
     exit()
-        #cgrad.append(self._avggrad(False)) # todo: add biases
     return np.array(cgrad)
 
 
