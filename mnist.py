@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 import numpy as np
 
-def displayImage(num):
-  print(labels[num])
-  for i in range(num, len(images)):
-    print(f"{images[i][num]:.2f}", end=" ")
-    if (i+1) % 28 == 0:
-      print()
+# math based on 3blue1brown
 
+# **** TRAIN ****
 with open('train.npy', 'rb') as f:
   images = np.load(f)
   labels = np.load(f)
 
-imgnum, pxlnum = images.shape # todo: rename to batch size or X (Xtrain, Xtest)
+imgnum, pxlnum = images.shape
 
 EPOCHS = 1
 BS = 25
@@ -21,7 +17,8 @@ LR = 1e-3
 # negative gradient of cost function = avg changes we want to make (to weights & biases) over all images
 
 def sigmoid(z):
-  return 1.0 / (1.0 + np.exp(z))
+  x = z - np.max(z) # numercial stabilitiy?
+  return 1 / (1 + np.exp(-x))
 
 def sigmoid_der(z):
   return sigmoid(z) - (1 - sigmoid(z))
@@ -31,6 +28,7 @@ def squarederror(x, y):
 
 def squarederror_der(x, y):
   return 2 * (x - y) 
+
 
 
 class layer:
@@ -110,9 +108,7 @@ class model:
     return np.sum(cn, axis=0) / BS # vektor
 
   def backward(self):
-    #print("**** BACK ****")
     cgradweights = np.empty((0, ), float)
-    #cgradbias = np.array([])
     cgradbiases = np.empty((0, ), float)
     # go through all biases and weights from input layer
     for self.currentlayer in range(1, self.dimnum):
@@ -126,16 +122,34 @@ class model:
         cgradbiases = np.append(cgradbiases, self._avggrad())
     return cgradweights, cgradbiases
 
-  # mean squarred error
-  def cost(self, x, y, avg=False):
-    c = squarederror(x, y)
-    c = c.sum(axis=0, keepdims=True) 
-    if avg:
-      return np.sum(c) / c.shape[1]
-    else: 
-      return c
+  
+  def optimizer(self):
+    cunt = 0
+    funt = 0
+    for i in range(1, self.dimnum):
+      for r in range(self.layers[i].dto): # for bias  (r, 0)
+        # biases
+        self.layers[i].biases[r][0] -= LR * namblab[funt]
+        funt += 1
+        for c in range(self.layers[i].dfrom):
+          # weights
+          self.layers[i].weights[r][c] -= LR * namblaw[cunt]
+          cunt += 1 
 
-# bx, l0: a0, l0
+  # mean squarred error
+  def loss(self):
+    c = squarederror(self.activations[-1], self.y)
+    c = c.sum(axis=0, keepdims=True) 
+    print("mean square error:", np.sum(c) / c.shape[1])
+        
+  def accuracy(self):
+    out = np.argmax(self.activations[-1], axis=0)
+    test = np.argmax(self.y, axis=0)
+    x = [1 if out[i] == test[i] else 0 for i in range(len(out))]
+    print("accuracy:", sum(x) / len(test))
+
+
+
 m = model(784, 64, 16, 10)
 
 for epoch in range(EPOCHS):
@@ -145,37 +159,28 @@ for epoch in range(EPOCHS):
     bx, by = bx.T, by.T
 
     m.forward(bx, by)
-    print("mean squared error", m.cost(m.activations[-1], by, 1))
+
+    m.loss()
 
     namblaw, namblab = m.backward()
-    #print("cn gradient w", namblaw, namblaw.shape)
-    #print("cn gradient b", namblab, namblab.shape)
+
+    m.optimizer()
+
+    m.accuracy()
+
+    #if i == 100 * BS:
+      #break
 
 
+exit()
 
+#with open('test.npy', 'rb') as f:
+  #testimages = np.load(f)
+  #testlabels = np.load(f)
 
-    # print("this")
-    # fuck = np.concatenate((m.layers[1].biases.flatten(), m.layers[2].biases.flatten(), m.layers[3].biases.flatten()))
-    # for i in range(90):
-    #   print(f"b{i}: {fuck[i]} -> {namblab[i]:.04f}", end="\t\t")
-    #   if i % 4 == 0:
-    #     print()
+#testimgnum, testpxlnum = testimages.shape
 
-
-    cunt = 0
-    funt = 0
-    for i in range(1, m.dimnum):
-      for r in range(m.layers[i].dto): # for bias  (r, 0)
-        # biases
-        #print(c,r,"\t\t", funt,"\t", m.layers[i].biases[r][0],"\t", namblab[funt])
-        m.layers[i].biases[r][0] += namblab[funt]
-        funt += 1
-        for c in range(m.layers[i].dfrom):
-          # weights
-          #print(c,r,"\t\t", cunt,"\t", m.layers[i].weights[r][c],"\t", namblaw[cunt])
-          m.layers[i].weights[r][c] += namblaw[cunt]
-          cunt += 1
-
-
-
-
+#tx, ty = testimages[0:0+BS], testlabels[0:0+BS]
+#tx, ty = tx.T, ty.T
+#m.forward(tx, ty)
+#m.accuracy()
