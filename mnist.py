@@ -55,20 +55,20 @@ class model:
       self.z.append(self.layers[i].z(self.activations[i-1]))
       self.activations.append(self._activationfunctions(i, self.z[i]))
 
-  def backward(self, y):
+  def backward(self, y): # todo: make recursive
     self.dz = []
     for i in range(self.layercnt - 1, 0, -1):
       if i == self.layercnt - 1:
-        self.dz.append(self._squarrederror_der(self.activations[-1], y))
+        self.dz.append(self._squarrederror_der(self.activations[-1], y)) # loss_der - y
       else:
-        self.dz.append(self.layers[i+1].weights.T @ self.dz[-1] * self._activationfunctions(i, self.z[i], False))
-      self.layers[i].dweights = self.dz[-1] @ self.activations[i-1].T / BS
-      self.layers[i].dbiases = np.sum(self.dz[-1], axis=1, keepdims=True) / BS
+        self.dz.append(self.layers[i+1].weights.T @ self.dz[-1] * self._activationfunctions(i, self.z[i], False)) # w @ dz * der_actfun
+      self.layers[i].dweights = (1 / BS) * self.dz[-1] @ self.activations[i-1].T # 1/m (dz @ a)
+      self.layers[i].dbiases = (1 / BS) * np.sum(self.dz[-1], axis=1, keepdims=True) # # 1/m (sum(dz, of columns))
 
   def gradient(self):
     for i in range(1, self.layercnt):
-      self.layers[i].weights = self.layers[i].weights - LR * self.layers[i].dweights
-      self.layers[i].biases = self.layers[i].biases - LR * self.layers[i].dbiases 
+      self.layers[i].weights = self.layers[i].weights - LR * self.layers[i].dweights # w = w - LR * der_w
+      self.layers[i].biases = self.layers[i].biases - LR * self.layers[i].dbiases # b = b - LR * der_b
 
   def accuracy(self, y):
     output = np.argmax(self.activations[-1], 0) 
